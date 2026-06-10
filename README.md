@@ -31,14 +31,15 @@ Only the **Main** template calls the API. The Site and Socket templates are *aut
 ## Requirements
 
 - Zabbix 7.0 server/proxy with outbound HTTPS to `api.catonetworks.com`.
-- A Cato API key with read access (CMA portal → **Administration → API & Integrations**).
-- Your Cato **account ID** (visible in the CMA portal URL).
+- A Cato API key with read access (CMA portal → **Resources → Service API Keys**).
+- Your Cato **account ID** (visible in the CMA portal URL after _/account/_).
 
 ## Installation
 
 1. **Import the template**
    - In Zabbix: **Data collection → Templates → Import** and select `zbx_cato_templates.json`.
    - This creates three templates and the required template/host groups.
+   - If import fails, manually create the template/host groups and update the template with the proper group UUIDS.
 
 2. **Create the central host**
    - Create a host named **exactly** `Cato Networks Cloud`.
