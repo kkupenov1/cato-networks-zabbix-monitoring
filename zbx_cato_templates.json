@@ -1,0 +1,759 @@
+{
+    "zabbix_export": {
+        "version": "7.0",
+        "template_groups": [
+            {
+                "uuid": "36bff6c29af64692839d077febfc7079",
+                "name": "Templates/Network devices"
+            }
+        ],
+        "host_groups": [
+            {
+                "uuid": "a3a44d7713a54542bdfcd292f257aaf1",
+                "name": "Network devices/Cato sites"
+            },
+            {
+                "uuid": "f883b01f358544988f269d6088ca6ab1",
+                "name": "Network devices/Cato sockets"
+            }
+        ],
+        "templates": [
+            {
+                "uuid": "f6371fa399df4c3596482e03f6b394e3",
+                "template": "Template Cato CMA",
+                "name": "Template Cato CMA (Main)",
+                "description": "Main template for monitoring Cato Networks via the GraphQL API. Attach this to a single host that MUST be named 'Cato Networks Cloud'. It polls the API once, then auto-discovers every active site and socket as its own Zabbix host and applies the 'Template Cato Site' / 'Template Cato Socket' templates to them. Set the {$CATO.ACCOUNT.ID} and {$CATO.API.KEY} macros before enabling.",
+                "groups": [
+                    {
+                        "name": "Templates/Network devices"
+                    }
+                ],
+                "items": [
+                    {
+                        "uuid": "4a8926e345bc421eb54e9aa12f47c622",
+                        "name": "Cato Networks API data",
+                        "type": "HTTP_AGENT",
+                        "key": "cato.api.data",
+                        "delay": "55s",
+                        "history": "1d",
+                        "value_type": "TEXT",
+                        "trends": "0",
+                        "url": "https://api.catonetworks.com/api/v1/graphql2",
+                        "description": "Master item. Polls the Cato Networks GraphQL API once and stores the raw JSON snapshot of all sites, sockets and interfaces. Every other metric in these templates is derived from this single request via dependent items and preprocessing, so the API is only called once per interval.",
+                        "posts": "{\n    \"query\": \"query GetSitesAndSockets { accountSnapshot(accountID: \\\"{$CATO.ACCOUNT.ID}\\\") { sites { id info { name description connType type } connectivityStatus operationalStatus devices { id identifier socketInfo { serial version platform isPrimary } connected lastConnected deviceUptime interfaces { id name connected tunnelRemoteIP tunnelUptime popName } } } } }\"\n}",
+                        "headers": [
+                            {
+                                "name": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "name": "x-api-key",
+                                "value": "{$CATO.API.KEY}"
+                            }
+                        ],
+                        "request_method": "POST",
+                        "tags": [
+                            {
+                                "tag": "component",
+                                "value": "api"
+                            }
+                        ]
+                    }
+                ],
+                "discovery_rules": [
+                    {
+                        "uuid": "c5716576b0a343a8a4a17ac1837f358b",
+                        "name": "Cato Remote Sites Discovery",
+                        "type": "DEPENDENT",
+                        "key": "cato.site.discovery",
+                        "delay": "0",
+                        "lifetime_type": "DELETE_NEVER",
+                        "lifetime": "0",
+                        "enabled_lifetime_type": "DISABLE_NEVER",
+                        "description": "Discovers all Cato connected sites.",
+                        "host_prototypes": [
+                            {
+                                "uuid": "4ff67d4ee9e54b5e94537315f5d371a8",
+                                "host": "Cato Site - {#SITE_NAME}",
+                                "name": "Cato Site - {#SITE_NAME}",
+                                "inventory_mode": "AUTOMATIC",
+                                "group_links": [
+                                    {
+                                        "group": {
+                                            "name": "Network devices/Cato sites"
+                                        }
+                                    }
+                                ],
+                                "group_prototypes": [
+                                    {
+                                        "name": "Sites/{#GROUP_SITE_NAME}"
+                                    }
+                                ],
+                                "templates": [
+                                    {
+                                        "name": "Template Cato Site"
+                                    }
+                                ],
+                                "macros": [
+                                    {
+                                        "macro": "{$CONN_TYPE}",
+                                        "value": "{#CONN_TYPE}"
+                                    },
+                                    {
+                                        "macro": "{$FULL_SITE_NAME}",
+                                        "value": "{#FULL_SITE_NAME}"
+                                    },
+                                    {
+                                        "macro": "{$GROUP_SITE_NAME}",
+                                        "value": "{#GROUP_SITE_NAME}"
+                                    },
+                                    {
+                                        "macro": "{$SITE_ID}",
+                                        "value": "{#SITE_ID}"
+                                    },
+                                    {
+                                        "macro": "{$SITE_NAME}",
+                                        "value": "{#SITE_NAME}"
+                                    }
+                                ],
+                                "tags": [
+                                    {
+                                        "tag": "assignment_group",
+                                        "value": "Zabbix Alarms"
+                                    },
+                                    {
+                                        "tag": "class",
+                                        "value": "network"
+                                    },
+                                    {
+                                        "tag": "device_type",
+                                        "value": "cato site"
+                                    },
+                                    {
+                                        "tag": "site",
+                                        "value": "{#GROUP_SITE_NAME}"
+                                    }
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "cato.api.data"
+                        },
+                        "lld_macro_paths": [
+                            {
+                                "lld_macro": "{#CONN_TYPE}",
+                                "path": "$.connType"
+                            },
+                            {
+                                "lld_macro": "{#FULL_SITE_NAME}",
+                                "path": "$.fullSiteName"
+                            },
+                            {
+                                "lld_macro": "{#GROUP_SITE_NAME}",
+                                "path": "$.groupSiteName"
+                            },
+                            {
+                                "lld_macro": "{#SITE_ID}",
+                                "path": "$.siteId"
+                            },
+                            {
+                                "lld_macro": "{#SITE_NAME}",
+                                "path": "$.siteName"
+                            }
+                        ],
+                        "preprocessing": [
+                            {
+                                "type": "JAVASCRIPT",
+                                "parameters": [
+                                    "var result = [];\nvar data = JSON.parse(value);\nvar sites = data.data.accountSnapshot.sites;\nfor (var i = 0; i < sites.length; i++) {\n    var site = sites[i];\n    if (site.operationalStatus === \"active\") {\n        var shortSiteName = (site.info.name.split(', ')[1] || site.info.name).replace(/[()]/g, '');\n        var fullSiteName = site.info.name.replace(/, /g, '/').replace(/[()]/g, '');\n        var groupSiteName = site.info.name.replace(/, /g, '/');\n        result.push({\n            fullSiteName: fullSiteName,\n            siteName: shortSiteName,\n            groupSiteName: groupSiteName,\n            siteId: site.id,\n            connType: site.info.connType\n        });\n    }\n}\nreturn JSON.stringify(result);"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "uuid": "1ad9bbf33068434cad592e0612f5af28",
+                        "name": "Cato Socket Discovery",
+                        "type": "DEPENDENT",
+                        "key": "cato.socket.discovery",
+                        "delay": "0",
+                        "lifetime_type": "DELETE_NEVER",
+                        "lifetime": "0",
+                        "enabled_lifetime_type": "DISABLE_NEVER",
+                        "description": "Discovers all Cato Networks sockets (X1500/X1600) in sites.",
+                        "host_prototypes": [
+                            {
+                                "uuid": "e4074c985c1e4893bb3dd78453259b31",
+                                "host": "{#TYPE} Cato Socket - {#SITE_NAME}",
+                                "name": "{#TYPE} Cato Socket - {#SITE_NAME}",
+                                "inventory_mode": "AUTOMATIC",
+                                "group_links": [
+                                    {
+                                        "group": {
+                                            "name": "Network devices/Cato sockets"
+                                        }
+                                    }
+                                ],
+                                "group_prototypes": [
+                                    {
+                                        "name": "Sites/{#GROUP_SITE_NAME}"
+                                    }
+                                ],
+                                "templates": [
+                                    {
+                                        "name": "Template Cato Socket"
+                                    }
+                                ],
+                                "macros": [
+                                    {
+                                        "macro": "{$FULL_SITE_NAME}",
+                                        "value": "{#FULL_SITE_NAME}"
+                                    },
+                                    {
+                                        "macro": "{$GROUP_SITE_NAME}",
+                                        "value": "{#GROUP_SITE_NAME}"
+                                    },
+                                    {
+                                        "macro": "{$PLATFORM}",
+                                        "value": "{#PLATFORM}"
+                                    },
+                                    {
+                                        "macro": "{$SERIAL}",
+                                        "value": "{#SERIAL}"
+                                    },
+                                    {
+                                        "macro": "{$SITE_ID}",
+                                        "value": "{#SITE_ID}"
+                                    },
+                                    {
+                                        "macro": "{$SITE_NAME}",
+                                        "value": "{#SITE_NAME}"
+                                    },
+                                    {
+                                        "macro": "{$SOCKET_ID}",
+                                        "value": "{#SOCKET_ID}"
+                                    },
+                                    {
+                                        "macro": "{$TYPE}",
+                                        "value": "{#TYPE}"
+                                    },
+                                    {
+                                        "macro": "{$VERSION}",
+                                        "value": "{#VERSION}"
+                                    }
+                                ],
+                                "tags": [
+                                    {
+                                        "tag": "assignment_group",
+                                        "value": "Zabbix Alarms"
+                                    },
+                                    {
+                                        "tag": "class",
+                                        "value": "network"
+                                    },
+                                    {
+                                        "tag": "device_type",
+                                        "value": "cato socket"
+                                    },
+                                    {
+                                        "tag": "site",
+                                        "value": "{#GROUP_SITE_NAME}"
+                                    },
+                                    {
+                                        "tag": "sn",
+                                        "value": "{#SERIAL}"
+                                    }
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "cato.api.data"
+                        },
+                        "lld_macro_paths": [
+                            {
+                                "lld_macro": "{#FULL_SITE_NAME}",
+                                "path": "$.fullSiteName"
+                            },
+                            {
+                                "lld_macro": "{#GROUP_SITE_NAME}",
+                                "path": "$.groupSiteName"
+                            },
+                            {
+                                "lld_macro": "{#PLATFORM}",
+                                "path": "$.socketInfo.platform"
+                            },
+                            {
+                                "lld_macro": "{#SERIAL}",
+                                "path": "$.socketInfo.serial"
+                            },
+                            {
+                                "lld_macro": "{#SITE_ID}",
+                                "path": "$.siteId"
+                            },
+                            {
+                                "lld_macro": "{#SITE_NAME}",
+                                "path": "$.siteName"
+                            },
+                            {
+                                "lld_macro": "{#SOCKET_ID}",
+                                "path": "$.socketId"
+                            },
+                            {
+                                "lld_macro": "{#TYPE}",
+                                "path": "$.type"
+                            },
+                            {
+                                "lld_macro": "{#VERSION}",
+                                "path": "$.socketInfo.version"
+                            }
+                        ],
+                        "preprocessing": [
+                            {
+                                "type": "JAVASCRIPT",
+                                "parameters": [
+                                    "var result = [];\ntry {\n    var data = JSON.parse(value);\n    if (data && data.data && data.data.accountSnapshot && data.data.accountSnapshot.sites) {\n        var sites = data.data.accountSnapshot.sites;\n        for (var i = 0; i < sites.length; i++) {\n            var site = sites[i];\n            if (site && site.devices && site.info && site.info.name && site.operationalStatus === \"active\") {\n                var shortSiteName = (site.info.name.split(', ')[1] || site.info.name).replace(/[()]/g, '');\n                var fullSiteName = site.info.name.replace(/, /g, '/').replace(/[()]/g, '');\n                var groupSiteName = site.info.name.replace(/, /g, '/');\n                for (var j = 0; j < site.devices.length; j++) {\n                    var device = site.devices[j];\n                    if (device && device.socketInfo) {\n                        result.push({\n                            socketInfo: device.socketInfo,\n                            fullSiteName: fullSiteName,\n                            siteName: shortSiteName,\n                            groupSiteName: groupSiteName,\n                            connected: device.connected,\n                            type: device.socketInfo.isPrimary === true ? \"Primary\" : \"Secondary\",\n                            socketId: device.id,\n                            siteId: site.id\n                        });\n                    }\n                }\n            }\n        }\n    }\n} catch (e) {\n    result = [];\n}\nreturn JSON.stringify(result);"
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "macros": [
+                    {
+                        "macro": "{$CATO.ACCOUNT.ID}",
+                        "value": "REPLACE_ME",
+                        "description": "Your Cato Networks account ID. Found in the CMA portal URL or via the API. Used in the GraphQL accountSnapshot query."
+                    },
+                    {
+                        "macro": "{$CATO.API.KEY}",
+                        "value": "REPLACE_ME",
+                        "description": "Cato Networks API key. Create one in the CMA portal under Administration > API & Integrations. Sent as the x-api-key header."
+                    }
+                ]
+            },
+            {
+                "uuid": "8fa6037915594da3807af80c750386cb",
+                "template": "Template Cato Site",
+                "name": "Template Cato Site (Auto-assigned)",
+                "description": "Per-site monitoring. Auto-assigned by the Main template's site discovery - do not attach manually. Tracks site connectivity and discovers per-ISP/WAN status. Relies on the central 'Cato Networks Cloud' host for raw API data.",
+                "groups": [
+                    {
+                        "name": "Templates/Network devices"
+                    }
+                ],
+                "items": [
+                    {
+                        "uuid": "764879555ac44aabb8d04b8fbdd1d318",
+                        "name": "Local API Data State",
+                        "type": "CALCULATED",
+                        "key": "cato.api.data.local",
+                        "history": "0",
+                        "value_type": "TEXT",
+                        "trends": "0",
+                        "params": "last(/Cato Networks Cloud/cato.api.data)",
+                        "description": "Pulls the latest raw API snapshot from the central host (named 'Cato Networks Cloud') and extracts only this site's object. All site-level metrics depend on this item. NOTE: the host that carries 'Template Cato CMA' MUST be named exactly 'Cato Networks Cloud' for this reference to resolve.",
+                        "preprocessing": [
+                            {
+                                "type": "JAVASCRIPT",
+                                "parameters": [
+                                    "var result = null;\ntry {\n    var data = JSON.parse(value);\n    if (data && data.data && data.data.accountSnapshot && data.data.accountSnapshot.sites) {\n        var sites = data.data.accountSnapshot.sites;\n        for (var i = 0; i < sites.length; i++) {\n            var site = sites[i];\n            if (site && site.id === '{$SITE_ID}') {\n                result = site;  // Return the whole site object\n                break;\n            }\n        }\n    }\n} catch (e) {\n    // Return null in case of any error\n}\nreturn JSON.stringify(result);"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "uuid": "1a1e51a431ba419390faebbb6c7fa1db",
+                        "name": "Site connectivity status",
+                        "type": "DEPENDENT",
+                        "key": "cato.site.connectivity",
+                        "delay": "0",
+                        "value_type": "FLOAT",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.connectivityStatus"
+                                ]
+                            },
+                            {
+                                "type": "JAVASCRIPT",
+                                "parameters": [
+                                    "return value === \"connected\" ? 1 : 0;"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "cato.api.data.local"
+                        },
+                        "tags": [
+                            {
+                                "tag": "component",
+                                "value": "socket"
+                            }
+                        ],
+                        "triggers": [
+                            {
+                                "uuid": "0ba10291ca4c4608b3fd52cbbf237d0a",
+                                "expression": "count(/Template Cato Site/cato.site.connectivity,2m,\"eq\",\"0\")>=2",
+                                "recovery_mode": "RECOVERY_EXPRESSION",
+                                "recovery_expression": "count(/Template Cato Site/cato.site.connectivity,10m,\"eq\",\"1\")>=10",
+                                "name": "Cato Site @ {$FULL_SITE_NAME} - Site is disconnected",
+                                "priority": "DISASTER",
+                                "description": "The whole site has lost connectivity, please review in the CMA portal and treat with high priority.",
+                                "tags": [
+                                    {
+                                        "tag": "scope",
+                                        "value": "availability"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "discovery_rules": [
+                    {
+                        "uuid": "1253500122854ec590d879ac82b16578",
+                        "name": "ISP Status Discovery",
+                        "type": "DEPENDENT",
+                        "key": "isp.discovery",
+                        "delay": "0",
+                        "lifetime_type": "DELETE_NEVER",
+                        "lifetime": "0",
+                        "enabled_lifetime_type": "DISABLE_NEVER",
+                        "item_prototypes": [
+                            {
+                                "uuid": "0ebd0fe3822f44fdac844015c51ee42b",
+                                "name": "{#ISP_NAME} Status",
+                                "type": "DEPENDENT",
+                                "key": "isp.status[{#WAN_ID}]",
+                                "delay": "0",
+                                "value_type": "CHAR",
+                                "trends": "0",
+                                "preprocessing": [
+                                    {
+                                        "type": "JAVASCRIPT",
+                                        "parameters": [
+                                            "try {\n    var data = JSON.parse(value);\n    var wanId = '{#WAN_ID}';\n    var isShared = '{#SHARED}' === 'yes';\n    \n    var device1Wan = data.devices[0].interfaces.find(function(i) { return i.id === wanId; });\n    var device2Wan = data.devices[1].interfaces.find(function(i) { return i.id === wanId; });\n    \n    if (isShared) {\n        return (device1Wan && device2Wan && device1Wan.connected && device2Wan.connected) ? 1 : 0;\n    } else {\n        if (device1Wan) return device1Wan.connected ? 1 : 0;\n        if (device2Wan) return device2Wan.connected ? 1 : 0;\n        return 0;\n    }\n} catch (error) {\n    return 0;\n}"
+                                        ]
+                                    }
+                                ],
+                                "master_item": {
+                                    "key": "cato.api.data.local"
+                                }
+                            }
+                        ],
+                        "master_item": {
+                            "key": "cato.api.data.local"
+                        },
+                        "lld_macro_paths": [
+                            {
+                                "lld_macro": "{#ISP_NAME}",
+                                "path": "$.ispName"
+                            },
+                            {
+                                "lld_macro": "{#SHARED}",
+                                "path": "$.shared"
+                            },
+                            {
+                                "lld_macro": "{#WAN_ID}",
+                                "path": "$.wanId"
+                            }
+                        ],
+                        "preprocessing": [
+                            {
+                                "type": "JAVASCRIPT",
+                                "parameters": [
+                                    "try {\n    var data = JSON.parse(value);\n    var result = [];\n    \n    if (!data.devices || data.devices.length < 2) {\n        return \"[]\";\n    }\n    \n    var device1 = data.devices[0];\n    var device2 = data.devices[1];\n    \n    // Process WAN1 interfaces\n    var wan1Device1 = device1.interfaces.find(function(i) { return i.id === \"WAN1\"; });\n    var wan1Device2 = device2.interfaces.find(function(i) { return i.id === \"WAN1\"; });\n    \n    if (wan1Device1 && wan1Device2) {\n        var isSharedWan1 = wan1Device1.tunnelRemoteIP === wan1Device2.tunnelRemoteIP;\n        result.push({\n            ispName: \"ISP1\",\n            wanId: \"WAN1\",\n            shared: isSharedWan1 ? \"yes\" : \"no\"\n        });\n    }\n    \n    // Process WAN2 interfaces\n    var wan2Device1 = device1.interfaces.find(function(i) { return i.id === \"WAN2\"; });\n    var wan2Device2 = device2.interfaces.find(function(i) { return i.id === \"WAN2\"; });\n    \n    if (wan2Device1 || wan2Device2) {\n        var isSharedWan2 = wan2Device1 && wan2Device2 && wan2Device1.tunnelRemoteIP === wan2Device2.tunnelRemoteIP;\n        result.push({\n            ispName: \"ISP2\",\n            wanId: \"WAN2\",\n            shared: isSharedWan2 ? \"yes\" : \"no\"\n        });\n    }\n    \n    return JSON.stringify(result);\n    \n} catch (error) {\n    return \"[]\";\n}"
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "valuemaps": [
+                    {
+                        "uuid": "5c55eca2610540808541f2cff33ca819",
+                        "name": "ISP Status",
+                        "mappings": [
+                            {
+                                "value": "0",
+                                "newvalue": "Down"
+                            },
+                            {
+                                "value": "1",
+                                "newvalue": "Up"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "uuid": "2eb81aea4b334a95b474a955d04a054e",
+                "template": "Template Cato Socket",
+                "name": "Template Cato Socket (Auto-assigned)",
+                "description": "Per-socket monitoring. Auto-assigned by the Main template's socket discovery - do not attach manually. Tracks socket connectivity, uptime and per-interface (WAN) status, with trigger dependencies so a full-site outage suppresses noisy downstream alerts. Relies on the central 'Cato Networks Cloud' host for raw API data.",
+                "groups": [
+                    {
+                        "name": "Templates/Network devices"
+                    }
+                ],
+                "items": [
+                    {
+                        "uuid": "949fe0685203473ca11b5ef2959e75dd",
+                        "name": "Local API Data State",
+                        "type": "CALCULATED",
+                        "key": "cato.api.data.local",
+                        "history": "0",
+                        "value_type": "TEXT",
+                        "trends": "0",
+                        "params": "last(/Cato Networks Cloud/cato.api.data)",
+                        "description": "Pulls the latest raw API snapshot from the central host (named 'Cato Networks Cloud') and extracts only this socket's device object (matched by serial). All socket-level metrics depend on this item. NOTE: the host that carries 'Template Cato CMA' MUST be named exactly 'Cato Networks Cloud' for this reference to resolve.",
+                        "preprocessing": [
+                            {
+                                "type": "JAVASCRIPT",
+                                "parameters": [
+                                    "var result = null;\ntry {\n    var data = JSON.parse(value);\n    if (data && data.data && data.data.accountSnapshot && data.data.accountSnapshot.sites) {\n        var sites = data.data.accountSnapshot.sites;\n        for (var i = 0; i < sites.length; i++) {\n            var site = sites[i];\n            if (site && site.devices) {\n                for (var j = 0; j < site.devices.length; j++) {\n                    var device = site.devices[j];\n                    if (device && device.socketInfo && device.socketInfo.serial === '{$SERIAL}') {\n                        result = device;\n                        result.siteConnectivityStatus = site.connectivityStatus;\n                        break;\n                    }\n                }\n            }\n            if (result) break;  // Exit outer loop if device found\n        }\n    }\n} catch (e) {\n    // Return null in case of any error\n}\nreturn JSON.stringify(result);"
+                                ]
+                            }
+                        ],
+                        "tags": [
+                            {
+                                "tag": "component",
+                                "value": "api"
+                            }
+                        ]
+                    },
+                    {
+                        "uuid": "34c7eb0141a640048b8a7b8ef59f50fa",
+                        "name": "Parent site connectivity status",
+                        "type": "DEPENDENT",
+                        "key": "cato.parent.site.connectivity",
+                        "delay": "0",
+                        "value_type": "FLOAT",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.siteConnectivityStatus"
+                                ]
+                            },
+                            {
+                                "type": "JAVASCRIPT",
+                                "parameters": [
+                                    "return value === \"connected\" ? 1 : 0;"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "cato.api.data.local"
+                        },
+                        "tags": [
+                            {
+                                "tag": "component",
+                                "value": "socket"
+                            }
+                        ],
+                        "triggers": [
+                            {
+                                "uuid": "cbc9b0112a9c4cd18ff6756b76fa9fc6",
+                                "expression": "max(/Template Cato Socket/cato.parent.site.connectivity,60)=0",
+                                "name": "Site down (dependency suppressor - do not notify)",
+                                "event_name": "Site down (dependency suppressor - do not notify)",
+                                "priority": "INFO",
+                                "description": "This trigger is intentional and is NOT meant to page anyone. Zabbix only suppresses a child trigger when its parent trigger is in the PROBLEM state. When an entire site goes offline, every socket and interface on it would otherwise alert at once. The per-socket and per-interface triggers depend on this one, so when the whole site is down only this single trigger fires and the noisy downstream alerts are suppressed. Exclude it from notifications by filtering on the tag type=dummy in your alert/action conditions.",
+                                "tags": [
+                                    {
+                                        "tag": "type",
+                                        "value": "dummy"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "uuid": "8f6e32984eb34721aae804221f8dd3e3",
+                        "name": "Socket connectivity status",
+                        "type": "DEPENDENT",
+                        "key": "cato.socket.connectivity",
+                        "delay": "0",
+                        "value_type": "FLOAT",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.connected"
+                                ]
+                            },
+                            {
+                                "type": "JAVASCRIPT",
+                                "parameters": [
+                                    "return value === \"true\" ? 1 : 0;"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "cato.api.data.local"
+                        },
+                        "tags": [
+                            {
+                                "tag": "component",
+                                "value": "socket"
+                            }
+                        ],
+                        "triggers": [
+                            {
+                                "uuid": "baee37117df64cb098d7e506ff3ae202",
+                                "expression": "count(/Template Cato Socket/cato.socket.connectivity,3m,\"eq\",\"0\")>=3",
+                                "recovery_mode": "RECOVERY_EXPRESSION",
+                                "recovery_expression": "count(/Template Cato Socket/cato.socket.connectivity,2m,\"eq\",\"1\")>=2",
+                                "name": "{$TYPE} Cato Socket ({$SERIAL}) @ {$FULL_SITE_NAME} - Socket is disconnected",
+                                "priority": "HIGH",
+                                "description": "The Cato Socket device has lost connectivity with the Cato Cloud, please review in the CMA portal.",
+                                "dependencies": [
+                                    {
+                                        "name": "Dummy Trigger - Site is Disconnected for 1 Minute",
+                                        "expression": "max(/Template Cato Socket/cato.parent.site.connectivity,60)=0"
+                                    }
+                                ],
+                                "tags": [
+                                    {
+                                        "tag": "scope",
+                                        "value": "availability"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "uuid": "37b5cefba3a549748ad0225f4ce127db",
+                        "name": "Socket uptime",
+                        "type": "DEPENDENT",
+                        "key": "cato.socket.uptime",
+                        "delay": "0",
+                        "value_type": "FLOAT",
+                        "units": "s",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.deviceUptime"
+                                ]
+                            },
+                            {
+                                "type": "JAVASCRIPT",
+                                "parameters": [
+                                    "return Number(value)"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "cato.api.data.local"
+                        },
+                        "tags": [
+                            {
+                                "tag": "component",
+                                "value": "socket"
+                            }
+                        ]
+                    }
+                ],
+                "discovery_rules": [
+                    {
+                        "uuid": "b7f305fafab441b2939c922cffc0bd1f",
+                        "name": "Interfaces discovery",
+                        "type": "DEPENDENT",
+                        "key": "cato.interface.discovery",
+                        "delay": "0",
+                        "lifetime_type": "DELETE_NEVER",
+                        "lifetime": "0",
+                        "enabled_lifetime_type": "DISABLE_NEVER",
+                        "description": "Discovers all interfaces on this Cato Networks socket.",
+                        "item_prototypes": [
+                            {
+                                "uuid": "34742a6c326147838a403e4fd8af3d62",
+                                "name": "Interface {#INTERFACE_NAME} connectivity status",
+                                "type": "DEPENDENT",
+                                "key": "cato.interface.connectivity[{#INTERFACE_ID}]",
+                                "delay": "0",
+                                "value_type": "FLOAT",
+                                "preprocessing": [
+                                    {
+                                        "type": "JSONPATH",
+                                        "parameters": [
+                                            "$..[?(@.id==\"{#INTERFACE_ID}\")].connected.first()"
+                                        ]
+                                    },
+                                    {
+                                        "type": "JAVASCRIPT",
+                                        "parameters": [
+                                            "return value === \"true\" ? 1 : 0;"
+                                        ]
+                                    }
+                                ],
+                                "master_item": {
+                                    "key": "cato.api.data.local"
+                                },
+                                "tags": [
+                                    {
+                                        "tag": "component",
+                                        "value": "interface"
+                                    }
+                                ],
+                                "trigger_prototypes": [
+                                    {
+                                        "uuid": "97ae2968d918435e9cee7923d37cd9dc",
+                                        "expression": "count(/Template Cato Socket/cato.interface.connectivity[{#INTERFACE_ID}],5m,\"eq\",\"0\")>=5",
+                                        "recovery_mode": "RECOVERY_EXPRESSION",
+                                        "recovery_expression": "count(/Template Cato Socket/cato.interface.connectivity[{#INTERFACE_ID}],2m,\"eq\",\"1\")>=2",
+                                        "name": "{$TYPE} Cato Socket ({$SERIAL}) @ {$FULL_SITE_NAME} - Interface {#INTERFACE_NAME} is down",
+                                        "priority": "AVERAGE",
+                                        "description": "The WAN Interface is down for more than 5 minutes. Review the switch it connects to or verify direct ISP connection using topologies. If linked to the core switch, check the physical connection first, then the port to the ISP.",
+                                        "dependencies": [
+                                            {
+                                                "name": "{$TYPE} Cato Socket ({$SERIAL}) @ {$FULL_SITE_NAME} - Socket is disconnected",
+                                                "expression": "count(/Template Cato Socket/cato.socket.connectivity,3m,\"eq\",\"0\")>=3",
+                                                "recovery_expression": "count(/Template Cato Socket/cato.socket.connectivity,2m,\"eq\",\"1\")>=2"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "cato.api.data.local"
+                        },
+                        "lld_macro_paths": [
+                            {
+                                "lld_macro": "{#INTERFACE_ID}",
+                                "path": "$.id"
+                            },
+                            {
+                                "lld_macro": "{#INTERFACE_NAME}",
+                                "path": "$.name"
+                            }
+                        ],
+                        "preprocessing": [
+                            {
+                                "type": "JAVASCRIPT",
+                                "parameters": [
+                                    "var data = JSON.parse(value);\nvar result = [];\nif (data && data.interfaces && Array.isArray(data.interfaces)) {\n    for (var i = 0; i < data.interfaces.length; i++) {\n        var iface = data.interfaces[i];\n        if (iface) {\n            result.push({\n                id: iface.id || '',\n                name: iface.name || '',\n                connected: iface.connected || false,\n                tunnelRemoteIP: iface.tunnelRemoteIP || '',\n                tunnelUptime: iface.tunnelUptime || 0,\n                popName: iface.popName || ''\n            });\n        }\n    }\n}\nreturn JSON.stringify(result);"
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "tags": [
+                    {
+                        "tag": "assignment_group",
+                        "value": "Zabbix Alarms"
+                    },
+                    {
+                        "tag": "class",
+                        "value": "network"
+                    },
+                    {
+                        "tag": "device_type",
+                        "value": "cato socket"
+                    }
+                ]
+            }
+        ]
+    }
+}
