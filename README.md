@@ -9,21 +9,21 @@ Monitor your [Cato Networks](https://www.catonetworks.com/) SASE deployment in Z
 ## How it works
 
 ```
-                 ┌───────────────────────────┐
-                 │  Host: "Cato Networks Cloud"│
-                 │  Template Cato CMA (Main)   │
-                 │  • 1 HTTP request to the API│
-                 │  • LLD: sites + sockets     │
-                 └──────────────┬──────────────┘
-            discovers & creates hosts (read raw data back)
-                 ┌──────────────┴──────────────┐
-        ┌────────▼─────────┐         ┌──────────▼─────────┐
-        │ Cato Site - <x>  │         │ <Type> Cato Socket │
-        │ Template Cato Site│        │ Template Cato Socket│
-        │ • site up/down   │         │ • socket up/down    │
-        │ • per-ISP status │         │ • uptime            │
-        └──────────────────┘         │ • per-interface (WAN)│
-                                     └──────────────────────┘
+                  ┌─────────────────────────────┐
+                  │  Host: "Cato Networks Cloud"  │
+                  │  Template Cato CMA (Main)     │
+                  │  • 1 HTTP request to the API  │
+                  │  • LLD: sites + sockets       │
+                  └───────────────┬───────────────┘
+              discovers & creates hosts (read raw data back)
+                  ┌───────────────┴───────────────┐
+        ┌─────────▼──────────┐         ┌───────────▼───────────┐
+        │   Cato Site - <x>  │         │   <Type> Cato Socket  │
+        │  Template Cato Site│         │  Template Cato Socket │
+        │  • site up/down    │         │  • socket up/down     │
+        │  • per-ISP status  │         │  • uptime             │
+        └────────────────────┘         │  • per-interface (WAN)│
+                                       └───────────────────────┘
 ```
 
 Only the **Main** template calls the API. The Site and Socket templates are *auto-assigned* by discovery and read the cached snapshot back from the central host via calculated items — so the API is hit just once regardless of how many sites you have.
