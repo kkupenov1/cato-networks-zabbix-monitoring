@@ -82,6 +82,13 @@ Zabbix only suppresses a child trigger when its *parent* trigger is in the `PROB
 
 **You should exclude it from notifications.** In your alert action conditions, add a condition to *not* notify when the tag `type` equals `dummy`.
 
+### Alternative Design Approach ###
+
+An alternative implementation is to model each site as a single Zabbix host and discover sockets and interfaces as low-level discovery (LLD) entities within that host. In this architecture, site, socket, and interface triggers all belong to the same host, allowing native trigger dependencies to function without requiring a suppressor trigger.
+
+The published template uses separate hosts for sites and sockets to align with other integrations and monitoring requirements. While this design works well for its intended use case, it may not be the optimal approach for every environment. If desired, the template can be refactored—potentially with the assistance of AI tools—to follow the single-host-per-site model.
+
+
 ## Tags
 
 Discovered hosts are tagged with `class`, `device_type`, `site`, `sn` (serial), and `assignment_group=Zabbix Alarms`. The `assignment_group` value is an example routing convention — change or remove it to match your own alerting/ITSM setup.
